@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter, Result};
 
 use strum_macros::EnumIter;
 
-#[derive(PartialEq, Eq, Hash, EnumIter, Copy, Clone)]
+#[derive(Clone, Copy, EnumIter, Eq, Hash, PartialEq)]
 pub enum Suit {
     SPADES,
     HEARTS,

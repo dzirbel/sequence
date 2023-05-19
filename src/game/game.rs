@@ -5,12 +5,14 @@ use crate::game::board::{Board, standard_board};
 use crate::game::card::Card;
 use crate::game::deck::Deck;
 use crate::game::player::Player;
+use crate::game::square::Square;
 use crate::game::team::Team;
+use crate::lib::generate_vector;
 
 pub struct Game {
     players: Vec<Box<dyn Player>>,
-    num_teams: usize,
     // specified since 6/12 player games could have 2 or 3 teams
+    num_teams: usize,
     turn_count: usize,
     up_index: usize,
     player_hands: Vec<Vec<Card>>,
@@ -18,13 +20,13 @@ pub struct Game {
     deck: Deck,
 }
 
-fn generate_vector<T, F>(count: usize, f: F) -> Vec<T> where F: FnMut(usize) -> T {
-    (0..count).map(f).collect()
-}
-
 impl Game {
+    // creates a new game
+    // TODO pass through same RNG source to deck
     pub fn new(players: Vec<Box<dyn Player>>, num_teams: usize) -> Game {
-        // TODO validate num_teams
+        if num_teams % players.len() != 0 {
+            panic!("invalid number of teams: {} for {} players", num_teams, players.len())
+        }
 
         let hand_size = Game::hand_size(players.len());
 
@@ -36,31 +38,65 @@ impl Game {
 
         // choose a random player as the first one (in the rules, players cut cards (aces high) and
         // the lowest card deals; the player to the left of the dealer goes first)
+        // TODO just use the given player order? that gives control over testing first player
+        //  advantage
         let up_index = Uniform::from(0..players.len()).sample(&mut thread_rng());
-
-        let board = standard_board();
 
         Game {
             players,
             num_teams,
             up_index,
             player_hands,
-            board,
+            board: standard_board(),
             deck,
             turn_count: 0,
         }
     }
 
     pub fn run_turn(&mut self, print_turn: bool) -> Option<Team> {
-        let player_team = self.player_team(self.up_index);
-        let player = &self.players[self.up_index];
-        let hand = &self.player_hands[self.up_index];
-        let hand_size = hand.len();
+        // optionally replace a dead card
+        let has_playable_card = self.replace_dead_card(print_turn);
+        if !has_playable_card {
+            if print_turn {
+                println!("Turn {}: player {} has no playable cards; skipping turn",
+                         self.turn_count, self.up_index);
+            }
 
-        let dead_cards = hand.iter().filter(|card| self.board.is_dead(card)).count();
-        let has_one_eyed_jack = hand.iter().any(|card| card.is_one_eyed_jack());
-        if dead_cards > 0 {
-            let replaced_card_choice = player.replace_dead_card(&player_team, &self.board, hand);
+            self.up_index = (self.up_index + 1) % self.players.len();
+            self.turn_count += 1;
+
+            return None;
+        }
+
+        // choose a card, validate it, remove it from the player's hand, and discard it
+        let (choice_card, choice_square) = self.play_card();
+
+        // place the chip on the board and check victory conditions
+        let result = self.place_chip(choice_card, choice_square, print_turn);
+
+        if print_turn {
+            self.board.print();
+        }
+
+        if result.is_some() {
+            return result;
+        }
+
+        // draw a new card
+        self.player_hands[self.up_index].push(self.deck.draw());
+
+        // advance turn counters
+        self.up_index = (self.up_index + 1) % self.players.len();
+        self.turn_count += 1;
+
+        None
+    }
+
+    // returns true if the player has any playable cards
+    fn replace_dead_card(&mut self, print: bool) -> bool {
+        let hand = &self.player_hands[self.up_index];
+        if hand.iter().any(|card| self.board.is_dead(card)) {
+            let replaced_card_choice = self.up_player().replace_dead_card(&self.board, hand);
             if let Some(replaced_card_index) = replaced_card_choice {
                 if replaced_card_index > hand.len() {
                     panic!(
@@ -70,48 +106,34 @@ impl Game {
                 }
 
                 let replaced_card = &self.player_hands[self.up_index].remove(replaced_card_index);
-                self.deck.discard(*replaced_card);
+                self.deck.discard(replaced_card.clone());
                 if !self.board.is_dead(replaced_card) {
                     panic!("replaced card was not dead");
                 }
 
-                if print_turn {
+                if print {
                     println!("Turn {}: player {} replaced dead card {}",
                              self.turn_count, self.up_index, replaced_card);
                 }
 
                 let new_card = self.deck.draw();
                 self.player_hands[self.up_index].push(new_card);
-
-                if (dead_cards == hand_size && self.board.is_dead(&new_card)) ||
-                    (self.board.is_full() && !has_one_eyed_jack) {
-                    // all cards were dead, and the new drawn card is as well; no playable cards
-                    if print_turn {
-                        println!("Turn {}: player {} has no playable cards; skipping turn",
-                                 self.turn_count, self.up_index);
-                    }
-                    self.up_index = (self.up_index + 1) % self.players.len();
-                    self.turn_count += 1;
-                    return None; // skip turn
-                }
-            } else if dead_cards == hand_size {
-                // all cards are dead and player chose not to replace one; no playable cards
-                if print_turn {
-                    println!("Turn {}: player {} has no playable cards; skipping turn",
-                             self.turn_count, self.up_index);
-                }
-                self.up_index = (self.up_index + 1) % self.players.len();
-                self.turn_count += 1;
-                return None; // skip turn
             }
         }
 
-        let (choice_index, choice_square) = player.play(
+        self.player_hands[self.up_index].iter()
+            .any(|card| self.board.can_be_played(card))
+    }
+
+    fn play_card(&mut self) -> (Card, Square) {
+        let player_team = Game::player_team(self.num_teams, self.up_index);
+        let (choice_index, choice_square) = self.up_player().play(
             &player_team,
             &self.board,
             &self.player_hands[self.up_index],
         );
 
+        let hand_size = self.player_hands[self.up_index].len();
         if choice_index > hand_size {
             panic!("card choice out of bounds: {choice_index} for hand size {}", hand_size)
         }
@@ -120,58 +142,59 @@ impl Game {
             panic!("invalid square choice: {choice_square}")
         }
 
-        let choice_card = &self.player_hands[self.up_index].remove(choice_index);
-        self.deck.discard(*choice_card);
+        let choice_card = self.player_hands[self.up_index].remove(choice_index);
+        self.deck.discard(choice_card);
 
-        let current_claim = self.board.chip_at(&choice_square);
-        if choice_card.is_one_eyed_jack() {
+        (choice_card, choice_square)
+    }
+
+    fn place_chip(&mut self, card: Card, square: Square, print: bool) -> Option<Team> {
+        let player_team = Game::player_team(self.num_teams, self.up_index);
+        let current_claim = self.board.chip_at(&square);
+        if card.is_one_eyed_jack() {
             match current_claim {
-                None => panic!("attempted to remove chip on unclaimed square {choice_square}"),
+                None => panic!("attempted to remove chip on unclaimed square {square}"),
                 Some(team) => {
                     if team == player_team {
-                        panic!("attempted to remove chip on own team's square {choice_square}")
+                        panic!("attempted to remove chip on own team's square {square}")
                     }
                 }
             }
 
-            self.board.remove_chip(&choice_square);
-            if print_turn {
+            self.board.remove_chip(&square);
+            if print {
                 println!(
                     "Turn {}: player {} played {}, a one-eyed Jack, and removed the chip on {}",
                     self.turn_count,
                     self.up_index,
-                    choice_card,
-                    choice_square,
+                    card,
+                    square,
                 );
             }
         } else {
             match current_claim {
-                Some(_) => panic!("attempted to put chip on claimed square {choice_square}"),
+                Some(_) => panic!("attempted to put chip on claimed square {square}"),
                 None => {
-                    if !choice_card.is_two_eyed_jack() {
-                        if let Some(card) = self.board.card_at(&choice_square) {
-                            if choice_card != &card {
-                                panic!(
-                                    "attempted to put chip on square not matching the \
-                                    chosen card {choice_card}: {choice_square}"
-                                )
-                            }
-                        }
+                    if !card.is_two_eyed_jack() && Some(card) != self.board.card_at(&square) {
+                        panic!(
+                            "attempted to put chip on square not matching the \
+                            chosen card {card}: {square}"
+                        )
                     }
                 }
             }
 
-            if print_turn {
+            if print {
                 println!(
                     "Turn {}: player {} played {} on {}",
                     self.turn_count,
                     self.up_index,
-                    choice_card,
-                    choice_square,
+                    card,
+                    square,
                 );
             }
 
-            let new_sequence = self.board.add_chip(&choice_square, player_team);
+            let new_sequence = self.board.add_chip(&square, player_team);
             if let Some(sequences) = new_sequence {
                 if sequences >= Game::winning_sequences(self.num_teams) {
                     return Some(player_team)
@@ -179,20 +202,16 @@ impl Game {
             }
         }
 
-        self.player_hands[self.up_index].push(self.deck.draw());
-
-        self.up_index = (self.up_index + 1) % self.players.len();
-        self.turn_count += 1;
-
         None
     }
 
-    pub fn print_board(&self) {
-        self.board.print();
+    fn up_player(&self) -> &Box<dyn Player> {
+        &self.players[self.up_index]
     }
 
-    fn player_team(&self, player_index: usize) -> Team {
-        let team_index = player_index % self.num_teams;
+    // gets the team that the player at the given index belongs to
+    pub fn player_team(num_teams: usize, player_index: usize) -> Team {
+        let team_index = player_index % num_teams;
         match team_index {
             0 => Team::ONE,
             1 => Team::TWO,
@@ -201,7 +220,8 @@ impl Game {
         }
     }
 
-    fn winning_sequences(num_teams: usize) -> usize {
+    // gets the number of sequences required to win, for the given number of teams
+    pub fn winning_sequences(num_teams: usize) -> usize {
         match num_teams {
             2 => 2,
             3 => 1,
@@ -209,7 +229,8 @@ impl Game {
         }
     }
 
-    fn hand_size(num_players: usize) -> usize {
+    // gets the size of each player's hand for the given number of players in the game
+    pub fn hand_size(num_players: usize) -> usize {
         match num_players {
             2 => 7,
             3 => 6,

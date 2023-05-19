@@ -1,18 +1,15 @@
-use strum::IntoEnumIterator;
-
-use rand::thread_rng;
 use rand::seq::SliceRandom;
+use rand::thread_rng;
 
 use crate::game::card::Card;
-use crate::game::rank::Rank;
-use crate::game::suit::Suit;
 
 pub struct Deck {
     draw_pile: Vec<Card>,
 
     // note: the game rules specify that each player keeps their own (visible) discard pile, but
     // since they are all shuffled together into the new pile when exhausted, a single discard pile
-    // appears to be equivalent
+    // appears to be equivalent (except perhaps for seeing which players played which cards, given
+    // that dead cards could interrupt the order)
     discard_pile: Vec<Card>,
 }
 
@@ -28,7 +25,7 @@ impl Deck {
         if let Some(card) = self.draw_pile.pop() { card } else { panic!("empty deck") }
     }
 
-    pub fn size(self) -> usize {
+    pub fn size(&self) -> usize {
         self.draw_pile.len()
     }
 
@@ -37,14 +34,11 @@ impl Deck {
     }
 
     pub fn new() -> Deck {
-        Deck {
-            draw_pile: Suit::iter()
-                .flat_map(|suit| Rank::iter().map(move |rank| Card { suit, rank }))
-                // copy each card twice in the deck
-                .flat_map(|card| vec![card, card])
-                .collect(),
-            discard_pile: Vec::new(),
-        }
+        // sequence deck contains two copies of a standard deck, shuffled
+        let mut draw_pile: Vec<Card> = Card::standard_deck().chain(Card::standard_deck()).collect();
+        draw_pile.shuffle(&mut thread_rng());
+
+        Deck { draw_pile, discard_pile: vec![] }
     }
 }
 

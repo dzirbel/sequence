@@ -1,6 +1,6 @@
 use rand::distributions::{Distribution, Uniform};
 use rand::thread_rng;
-use rand::prelude::SliceRandom;
+use rand::seq::IteratorRandom;
 
 use crate::game::board::{Board, BOARD_SIZE};
 use crate::game::card::Card;
@@ -70,7 +70,7 @@ impl Player for RandomPlayer {
             let squares = board.unoccupied_squares_for_card(&card);
             let square_choice = squares.choose(&mut thread_rng());
             if let Some(square) = square_choice {
-                (card_index, *square)
+                (card_index, square)
             } else {
                 // attempted to play a dead card; try again
                 self.play(team, board, hand)

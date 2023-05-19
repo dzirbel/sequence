@@ -1,3 +1,6 @@
+use std::collections::HashSet;
+use itertools::iproduct;
+
 use crate::game::card::Card;
 use crate::game::rank::Rank;
 use crate::game::square::Square;
@@ -10,107 +13,88 @@ pub const SEQUENCE_LENGTH: usize = 5;
 pub struct Board {
     pub cards: [[Option<Card>; BOARD_SIZE]; BOARD_SIZE],
     chips: [[Option<Team>; BOARD_SIZE]; BOARD_SIZE],
-    sequences: Vec<(Team, Vec<Square>)>,
+    sequences: Vec<(Team, HashSet<Square>)>,
 }
 
 impl Board {
-    pub fn is_playable(square: &Square) -> bool {
-        Board::is_valid(square) && !Board::is_corner(square)
-    }
-
-    pub fn is_corner(square: &Square) -> bool {
-        (square.row == 0 && square.col == 0) ||
-            (square.row == 0 && square.col == BOARD_SIZE - 1) ||
-            (square.row == BOARD_SIZE - 1 && square.col == 0) ||
-            (square.row == BOARD_SIZE - 1 && square.col == BOARD_SIZE - 1)
-    }
-
     pub fn is_valid(square: &Square) -> bool {
         square.row < BOARD_SIZE && square.col < BOARD_SIZE
     }
 
+    pub fn is_playable(square: &Square) -> bool {
+        Board::is_valid(square) && !Board::is_corner_square(square)
+    }
+
+    pub fn playable_squares() -> impl Iterator<Item=(usize, usize)> {
+        iproduct!(0..BOARD_SIZE, 0..BOARD_SIZE)
+            .filter(|(row, col)| !Board::is_corner(*row, *col))
+    }
+
+    pub fn is_corner(row: usize, col: usize) -> bool {
+        (row == 0 || row == BOARD_SIZE - 1) && (col == 0 || col == BOARD_SIZE - 1)
+    }
+
+    pub fn is_corner_square(square: &Square) -> bool {
+        Board::is_corner(square.row, square.col)
+    }
+
+    // returns the card at the given square; None for corners
     pub fn card_at(&self, square: &Square) -> Option<Card> {
         self.cards[square.row][square.col]
     }
 
-    pub fn is_dead(&self, card: &Card) -> bool {
-        if card.rank == Rank::JACK { return false; }
-
-        for row in 0..BOARD_SIZE {
-            for col in 0..BOARD_SIZE {
-                if let Some(c) = self.cards[row][col] {
-                    if &c == card && self.chips[row][col] == None {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        true
-    }
-
     pub fn is_full(&self) -> bool {
-        for row in 0..BOARD_SIZE {
-            for col in 0..BOARD_SIZE {
-                if Board::is_corner(&Square { row, col }) {
-                    continue;
-                }
-
-                if self.chips[row][col] == None {
-                    return false;
-                }
-            }
-        }
-
-        true
+        Board::playable_squares().all(|(row, col)| self.chips[row][col].is_some())
     }
 
     pub fn is_empty(&self) -> bool {
-        for row in 0..BOARD_SIZE {
-            for col in 0..BOARD_SIZE {
-                if Board::is_corner(&Square { row, col }) {
-                    continue;
-                }
-
-                if self.chips[row][col] != None {
-                    return false;
-                }
-            }
-        }
-
-        true
+        Board::playable_squares().all(|(row, col)| self.chips[row][col].is_none())
     }
 
-    // note: returns empty vector for jacks
-    pub fn unoccupied_squares_for_card(&self, card: &Card) -> Vec<Square> {
-        let mut squares = Vec::new();
-        for row in 0..BOARD_SIZE {
-            for col in 0..BOARD_SIZE {
-                if let Some(c) = self.cards[row][col] {
-                    if &c == card && self.chips[row][col] == None {
-                        squares.push(Square { row, col })
-                    }
-                }
-            }
+    // checks if the given card is dead, i.e. not a Jack and both of its squares already have a chip
+    pub fn is_dead(&self, card: &Card) -> bool {
+        if card.rank == Rank::JACK { return false; }
+
+        !Board::playable_squares()
+            .any(|(row, col)| self.cards[row][col] == Some(*card) && self.chips[row][col].is_none())
+    }
+
+    pub fn can_be_played(&self, card: &Card) -> bool {
+        if card.is_one_eyed_jack() {
+            !self.is_empty()
+        } else if card.is_two_eyed_jack() {
+            !self.is_full()
+        } else {
+            !self.is_dead(card)
         }
-        squares
+    }
+
+    // note: returns empty iterator for jacks
+    pub fn unoccupied_squares_for_card<'a>(&'a self, card: &'a Card) -> impl Iterator<Item=Square> + 'a {
+        Board::playable_squares()
+            .filter(|(row, col)| {
+                self.cards[*row][*col] == Some(*card) && self.chips[*row][*col].is_none()
+            })
+            .map(|(row, col)| Square { row, col })
     }
 
     pub fn chip_at(&self, square: &Square) -> Option<Team> {
-        return self.chips[square.row][square.col]
+        return self.chips[square.row][square.col];
     }
 
-    pub fn belongs_to(&self, square: &Square, team: Team) -> bool {
-        Board::is_corner(square) || self.chip_at(square) == Some(team)
+    // returns true if the given team has a chip at the given square, or it is a corner square
+    pub fn counts_for(&self, square: &Square, team: Team) -> bool {
+        Board::is_corner_square(square) || self.chip_at(square) == Some(team)
     }
 
+    // returns true if the given square is in a sequence
     pub fn in_sequence(&self, square: &Square) -> bool {
         self.sequences.iter().any(|(_, seq)| seq.contains(square))
     }
 
     pub fn remove_chip(&mut self, square: &Square) {
         if !Board::is_playable(square) {
-            panic!("attempted to place chip at non-playable square {square}")
+            panic!("attempted to remove chip at non-playable square {square}")
         }
 
         if self.in_sequence(square) {
@@ -126,15 +110,19 @@ impl Board {
             panic!("attempted to place chip at non-playable square {square}")
         }
 
+        if self.chip_at(square).is_some() {
+            panic!("attempted to place chip with a chip already present at {square}")
+        }
+
         self.chips[square.row][square.col] = Some(team);
         self.find_new_sequences(square, team)
     }
 
     pub fn print(&self) {
-        self.print_with_highlighted_cards(vec![])
+        self.print_with_highlighted_cards(&HashSet::new())
     }
 
-    pub fn print_with_highlighted_cards(&self, cards: Vec<Card>) {
+    pub fn print_with_highlighted_cards(&self, cards: &HashSet<Card>) {
         for (i, row) in self.cards.iter().enumerate() {
             for (j, card) in row.iter().enumerate() {
                 let square = Square { row: i, col: j };
@@ -154,10 +142,8 @@ impl Board {
                         } else {
                             base
                         }
-                    },
-                    Some(team) => {
-                        team.with_team_color(base, self.in_sequence(&square))
-                    },
+                    }
+                    Some(team) => team.with_team_color(&base, self.in_sequence(&square))
                 };
 
                 print!("| {colored} ")
@@ -184,19 +170,20 @@ impl Board {
 
             let mut used_existing_sequence = false;
             let mut length = 1;
-            let mut squares = vec![*source_square];
+            let mut squares = HashSet::new();
+            squares.insert(*source_square);
 
             // returns true if we can keep continuing in that direction, false to stop
             let mut check = |square| -> bool {
-                if Board::is_valid(&square) && self.belongs_to(&square, team) {
+                if Board::is_valid(&square) && self.counts_for(&square, team) {
                     if self.in_sequence(&square) {
                         if used_existing_sequence { return false; }
                         used_existing_sequence = true;
                     }
 
                     length += 1;
-                    if !Board::is_corner(&square) {
-                        squares.push(square);
+                    if !Board::is_corner_square(&square) {
+                        squares.insert(square);
                     }
                     true
                 } else {
@@ -238,6 +225,18 @@ impl Board {
     }
 }
 
+/*
+| a0 -- | b0 2♠ | c0 3♠ | d0 4♠ | e0 5♠ | f0 6♠ | g0 7♠ | h0 8♠ | i0 9♠ | j0 -- |
+| a1 6♣ | b1 5♣ | c1 4♣ | d1 3♣ | e1 2♣ | f1 A♥ | g1 K♥ | h1 Q♥ | i1 T♥ | j1 T♠ |
+| a2 7♣ | b2 A♠ | c2 2♦ | d2 3♦ | e2 4♦ | f2 5♦ | g2 6♦ | h2 7♦ | i2 9♥ | j2 Q♠ |
+| a3 8♣ | b3 K♠ | c3 6♣ | d3 5♣ | e3 4♣ | f3 3♣ | g3 2♣ | h3 8♦ | i3 8♥ | j3 K♠ |
+| a4 9♣ | b4 Q♠ | c4 7♣ | d4 6♥ | e4 5♥ | f4 4♥ | g4 A♥ | h4 9♦ | i4 7♥ | j4 A♠ |
+| a5 T♣ | b5 T♠ | c5 8♣ | d5 7♥ | e5 2♥ | f5 3♥ | g5 K♥ | h5 T♦ | i5 6♥ | j5 2♦ |
+| a6 Q♣ | b6 9♠ | c6 9♣ | d6 8♥ | e6 9♥ | f6 T♥ | g6 Q♥ | h6 Q♦ | i6 5♥ | j6 3♦ |
+| a7 K♣ | b7 8♠ | c7 T♣ | d7 Q♣ | e7 K♣ | f7 A♣ | g7 A♦ | h7 K♦ | i7 4♥ | j7 4♦ |
+| a8 A♣ | b8 7♠ | c8 6♠ | d8 5♠ | e8 4♠ | f8 3♠ | g8 2♠ | h8 2♥ | i8 3♥ | j8 5♦ |
+| a9 -- | b9 A♦ | c9 K♦ | d9 Q♦ | e9 T♦ | f9 9♦ | g9 8♦ | h9 7♦ | i9 6♦ | j9 -- |
+*/
 pub fn standard_board() -> Board {
     Board {
         chips: [[None; BOARD_SIZE]; BOARD_SIZE],
@@ -406,25 +405,12 @@ mod tests {
             }
         }
 
-        for card in Card::new_deck() {
+        for card in Card::standard_deck() {
             let expected = if card.rank == Rank::JACK { None } else { Some(&2) };
             let actual = counts.get(&card);
             assert_eq!(expected, actual, "Card count was unexpected for {}", card);
         }
     }
-
-    /*
-    | a0 -- | b0 2♠ | c0 3♠ | d0 4♠ | e0 5♠ | f0 6♠ | g0 7♠ | h0 8♠ | i0 9♠ | j0 -- |
-    | a1 6♣ | b1 5♣ | c1 4♣ | d1 3♣ | e1 2♣ | f1 A♥ | g1 K♥ | h1 Q♥ | i1 T♥ | j1 T♠ |
-    | a2 7♣ | b2 A♠ | c2 2♦ | d2 3♦ | e2 4♦ | f2 5♦ | g2 6♦ | h2 7♦ | i2 9♥ | j2 Q♠ |
-    | a3 8♣ | b3 K♠ | c3 6♣ | d3 5♣ | e3 4♣ | f3 3♣ | g3 2♣ | h3 8♦ | i3 8♥ | j3 K♠ |
-    | a4 9♣ | b4 Q♠ | c4 7♣ | d4 6♥ | e4 5♥ | f4 4♥ | g4 A♥ | h4 9♦ | i4 7♥ | j4 A♠ |
-    | a5 T♣ | b5 T♠ | c5 8♣ | d5 7♥ | e5 2♥ | f5 3♥ | g5 K♥ | h5 T♦ | i5 6♥ | j5 2♦ |
-    | a6 Q♣ | b6 9♠ | c6 9♣ | d6 8♥ | e6 9♥ | f6 T♥ | g6 Q♥ | h6 Q♦ | i6 5♥ | j6 3♦ |
-    | a7 K♣ | b7 8♠ | c7 T♣ | d7 Q♣ | e7 K♣ | f7 A♣ | g7 A♦ | h7 K♦ | i7 4♥ | j7 4♦ |
-    | a8 A♣ | b8 7♠ | c8 6♠ | d8 5♠ | e8 4♠ | f8 3♠ | g8 2♠ | h8 2♥ | i8 3♥ | j8 5♦ |
-    | a9 -- | b9 A♦ | c9 K♦ | d9 Q♦ | e9 T♦ | f9 9♦ | g9 8♦ | h9 7♦ | i9 6♦ | j9 -- |
-     */
 
     #[test]
     fn create_horizontal_sequence_in_order() {

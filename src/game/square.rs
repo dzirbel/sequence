@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Square {
     pub row: usize,
     pub col: usize,
@@ -8,8 +8,6 @@ pub struct Square {
 
 impl Display for Square {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // char = 'a' + col
-        // col = char - 'a'
         let col_char = (('a' as u8) + self.col as u8) as char;
         write!(f, "{}{}", col_char, self.row)
     }
@@ -23,12 +21,12 @@ impl Square {
         let col_char = chars.next().unwrap();
         let row_char = chars.next().unwrap();
         Square {
-            col: (col_char as u8 - 'a' as u8) as usize,
-            row: (row_char as u8 - '0' as u8) as usize,
+            col: (col_char as usize).saturating_sub('a' as usize),
+            row: (row_char as usize).saturating_sub('0' as usize),
         }
     }
 
-    pub fn plus(self, row_delta: i8, col_delta: i8) -> Square {
+    pub fn plus(&self, row_delta: i8, col_delta: i8) -> Square {
         Square {
             row: (self.row as i8 + row_delta) as usize,
             col: (self.col as i8 + col_delta) as usize,
