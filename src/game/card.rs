@@ -1,13 +1,12 @@
 use std::fmt::{Display, Formatter};
 
-use strum::IntoEnumIterator;
-
 use itertools::iproduct;
+use strum::IntoEnumIterator;
 
 use crate::game::rank::Rank;
 use crate::game::suit::Suit;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Card {
     pub rank: Rank,
     pub suit: Suit,

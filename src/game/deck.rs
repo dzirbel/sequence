@@ -25,8 +25,12 @@ impl Deck {
         if let Some(card) = self.draw_pile.pop() { card } else { panic!("empty deck") }
     }
 
-    pub fn size(&self) -> usize {
+    pub fn draw_pile_size(&self) -> usize {
         self.draw_pile.len()
+    }
+
+    pub fn discard_pile(&self) -> &[Card] {
+        return &self.discard_pile;
     }
 
     pub fn discard(&mut self, card: Card) {
@@ -42,3 +46,50 @@ impl Deck {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    impl Deck {
+        fn assert_draw_pile_contains(&self, cards: &Vec<Card>) {
+            let mut draw_pile_sorted = self.draw_pile.clone();
+            draw_pile_sorted.sort();
+
+            let mut cards_sorted = cards.clone();
+            cards_sorted.sort();
+
+            assert!(*draw_pile_sorted == cards_sorted);
+        }
+    }
+
+    #[test]
+    fn new_deck_has_two_of_each_card() {
+        let deck = Deck::new();
+        deck.assert_draw_pile_contains(
+            &Card::standard_deck().chain(Card::standard_deck()).collect()
+        );
+        assert!(deck.discard_pile().is_empty());
+    }
+
+    #[test]
+    fn deck_is_reshuffled_when_exhausted() {
+        let mut deck = Deck::new();
+
+        let mut discarded_cards = vec![];
+        while deck.draw_pile_size() > 0 {
+            let card = deck.draw();
+            deck.discard(card);
+            discarded_cards.push(card);
+        }
+
+        assert_eq!(0, deck.draw_pile_size());
+        assert!(discarded_cards == deck.discard_pile);
+        let last_card = deck.draw();
+
+        let mut deck_minus_last_card = Deck::new().draw_pile;
+        let last_card_index = deck_minus_last_card.iter().position(|c| c == &last_card).unwrap();
+        deck_minus_last_card.remove(last_card_index);
+        deck.assert_draw_pile_contains(&deck_minus_last_card);
+        assert!(deck.discard_pile().is_empty());
+    }
+}
