@@ -129,8 +129,9 @@ impl Game {
         let player_team = Game::player_team(self.num_teams, self.up_index);
         let (choice_index, choice_square) = self.up_player().play(
             &player_team,
-            &self.board,
             &self.player_hands[self.up_index],
+            &self.board,
+            &self.deck,
         );
 
         let hand_size = self.player_hands[self.up_index].len();

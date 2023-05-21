@@ -5,7 +5,7 @@ mod game;
 mod lib;
 mod players;
 
-const N: i32 = 100_000;
+const N: i32 = 1_000;
 const PRINT_TURNS: bool = false;
 
 fn main() {

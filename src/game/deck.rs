@@ -22,7 +22,7 @@ impl Deck {
             self.discard_pile.clear();
         }
 
-        if let Some(card) = self.draw_pile.pop() { card } else { panic!("empty deck") }
+        self.draw_pile.pop().unwrap_or_else(|| panic!("empty deck"))
     }
 
     pub fn draw_pile_size(&self) -> usize {

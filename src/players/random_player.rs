@@ -3,6 +3,7 @@ use rand::seq::IteratorRandom;
 
 use crate::game::board::Board;
 use crate::game::card::Card;
+use crate::game::deck::Deck;
 use crate::game::player::Player;
 use crate::game::square::Square;
 use crate::game::team::Team;
@@ -30,20 +31,20 @@ fn rand_occupied_square_not_in_sequence(board: &Board, excluding_team: &Team) ->
 }
 
 impl Player for RandomPlayer {
-    fn play(&self, team: &Team, board: &Board, hand: &Vec<Card>) -> (u8, Square) {
+    fn play(&self, team: &Team, hand: &Vec<Card>, board: &Board, deck: &Deck) -> (u8, Square) {
         // choose a random card
         let (card_index, card) = hand.iter().enumerate().choose(&mut thread_rng()).unwrap();
 
         if card.is_one_eyed_jack() {
             if board.is_empty() {
                 // attempted to play a one-eyed jack on an empty board; try again
-                return self.play(team, board, hand);
+                return self.play(team, hand, board, deck);
             }
             (card_index as u8, rand_occupied_square_not_in_sequence(board, team))
         } else if card.is_two_eyed_jack() {
             if board.is_full() {
                 // attempted to play a two-eyed jack on a full board; try again
-                return self.play(team, board, hand);
+                return self.play(team, hand, board, deck);
             }
             (card_index as u8, rand_unoccupied_square(board))
         } else {
@@ -53,7 +54,7 @@ impl Player for RandomPlayer {
                 (card_index as u8, square)
             } else {
                 // attempted to play a dead card; try again
-                self.play(team, board, hand)
+                self.play(team, hand, board, deck)
             }
         }
     }
