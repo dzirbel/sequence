@@ -4,6 +4,7 @@ pub mod deck;
 pub mod game;
 pub mod player;
 pub mod rank;
-pub mod suit;
 pub mod square;
+pub mod standard_board;
+pub mod suit;
 pub mod team;

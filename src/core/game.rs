@@ -1,4 +1,4 @@
-use crate::core::board::{Board, standard_board};
+use crate::core::board::Board;
 use crate::core::card::Card;
 use crate::core::deck::Deck;
 use crate::core::player::Player;
@@ -38,7 +38,7 @@ impl Game {
             num_teams,
             up_index: 0, // use given player order
             player_hands,
-            board: standard_board(),
+            board: Board::new(),
             deck,
             turn_count: 0,
         }

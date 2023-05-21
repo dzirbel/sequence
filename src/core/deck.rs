@@ -95,6 +95,7 @@ mod tests {
         let mut deck_minus_last_card = Deck::new().draw_pile;
         let last_card_index = deck_minus_last_card.iter().position(|c| c == &last_card).unwrap();
         deck_minus_last_card.remove(last_card_index);
+
         deck.assert_draw_pile_contains(&deck_minus_last_card);
         assert!(deck.discard_pile().is_empty());
     }
