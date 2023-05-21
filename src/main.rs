@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use crate::game::game::Game;
 use crate::game::player::Player;
 use crate::players::random_player::RandomPlayer;
 
@@ -9,16 +11,23 @@ const N: i32 = 1_000;
 const PRINT_TURNS: bool = false;
 
 fn main() {
+    let mut winners = HashMap::new();
+
     for i in 0..N {
         let players: Vec<Box<dyn Player>> = vec!(
             Box::new(RandomPlayer {}),
             Box::new(RandomPlayer {}),
         );
 
-        let mut game = game::game::Game::new(players, 2);
+        let winner = Game::new(players, 2).run(PRINT_TURNS);
+        winners.entry(winner).and_modify(|count| *count += 1).or_insert(1);
 
-        while game.run_turn(PRINT_TURNS).is_none() {}
+        println!("Finished game {}/{} : {} won", i + 1, N, winner);
+    }
 
-        println!("Finished game {}/{}", i + 1, N);
+    println!();
+    println!("Done!");
+    for (team, win_count) in winners {
+        println!("{} : {}", team, win_count);
     }
 }

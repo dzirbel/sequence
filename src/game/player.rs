@@ -3,7 +3,6 @@ use crate::game::card::Card;
 use crate::game::deck::Deck;
 use crate::game::square::Square;
 use crate::game::team::Team;
-use crate::lib::some_if;
 
 pub trait Player {
     // return <card index in hand, square on which to play the card>

@@ -36,20 +36,22 @@ impl Game {
             generate_vector(hand_size, |_| deck.draw())
         });
 
-        // choose a random player as the first one (in the rules, players cut cards (aces high) and
-        // the lowest card deals; the player to the left of the dealer goes first)
-        // TODO just use the given player order? that gives control over testing first player
-        //  advantage
-        let up_index = Uniform::from(0..players.len()).sample(&mut thread_rng());
-
         Game {
             players,
             num_teams,
-            up_index,
+            up_index: 0, // use given player order
             player_hands,
             board: standard_board(),
             deck,
             turn_count: 0,
+        }
+    }
+
+    pub fn run(&mut self, print_turns: bool) -> Team {
+        loop {
+            if let Some(winner) = self.run_turn(print_turns) {
+                return winner;
+            }
         }
     }
 
