@@ -3,8 +3,8 @@ use std::fmt::{Display, Formatter};
 use itertools::iproduct;
 use strum::IntoEnumIterator;
 
-use crate::game::rank::Rank;
-use crate::game::suit::Suit;
+use crate::core::rank::Rank;
+use crate::core::suit::Suit;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Card {
@@ -21,12 +21,12 @@ impl Display for Card {
 impl Card {
     // one-eyed jacks remove
     pub fn is_one_eyed_jack(&self) -> bool {
-        self.rank == Rank::JACK && (self.suit == Suit::SPADES || self.suit == Suit::HEARTS)
+        self.rank == Rank::Jack && (self.suit == Suit::Spades || self.suit == Suit::Hearts)
     }
 
     // two-eyed jacks are wild
     pub fn is_two_eyed_jack(&self) -> bool {
-        self.rank == Rank::JACK && (self.suit == Suit::DIAMONDS || self.suit == Suit::CLUBS)
+        self.rank == Rank::Jack && (self.suit == Suit::Diamonds || self.suit == Suit::Clubs)
     }
 
     // returns a new vector of cards where each suit/rank combination is represented exactly once

@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 use itertools::iproduct;
-use crate::game::board::BOARD_SIZE;
+use crate::core::board::BOARD_SIZE;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Square {
@@ -10,7 +10,7 @@ pub struct Square {
 
 impl Display for Square {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let col_char = (('a' as u8) + self.col as u8) as char;
+        let col_char = (b'a' + self.col) as char;
         write!(f, "{}{}", col_char, self.row)
     }
 }
@@ -47,7 +47,7 @@ impl Square {
 
 #[cfg(test)]
 mod tests {
-    use crate::game::square::Square;
+    use crate::core::square::Square;
 
     impl Square {
         pub fn from_notation(notation: &str) -> Square {

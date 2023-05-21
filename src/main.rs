@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use crate::game::game::Game;
-use crate::game::player::Player;
+use crate::core::game::Game;
+use crate::core::player::Player;
 use crate::players::random_player::RandomPlayer;
 
-mod game;
-mod lib;
+pub mod core;
 mod players;
+pub mod util;
 
 const N: i32 = 1_000;
 const PRINT_TURNS: bool = false;

@@ -1,12 +1,12 @@
 use std::collections::HashSet;
 
-use option_ext::OptionExt;
+use crate::core::card::Card;
+use crate::core::rank::Rank;
+use crate::core::square::Square;
+use crate::core::suit::Suit;
+use crate::core::team::Team;
 
-use crate::game::card::Card;
-use crate::game::rank::Rank;
-use crate::game::square::Square;
-use crate::game::suit::Suit;
-use crate::game::team::Team;
+use crate::util::wrapper::Wrapper;
 
 pub const BOARD_SIZE: u8 = 10;
 pub const SEQUENCE_LENGTH: u8 = 5;
@@ -26,7 +26,7 @@ impl Board {
 
     // returns the team which has claimed the given square; None if unclaimed (or a corner)
     pub fn chip_at(&self, square: &Square) -> Option<Team> {
-        return self.chips[square.row as usize][square.col as usize];
+        self.chips[square.row as usize][square.col as usize]
     }
 
     // returns true if there is a chip on all playable squares
@@ -41,10 +41,10 @@ impl Board {
 
     // checks if the given card is dead, i.e. not a Jack and both of its squares already have a chip
     pub fn is_dead(&self, card: &Card) -> bool {
-        if card.rank == Rank::JACK { return false; }
+        if card.rank == Rank::Jack { return false; }
 
         !Square::playable_squares()
-            .any(|square| self.card_at(&square).contains(card) && self.chip_at(&square).is_none())
+            .any(|square| self.card_at(&square).wraps(card) && self.chip_at(&square).is_none())
     }
 
     // checks if it is possible to play the given card:
@@ -65,13 +65,13 @@ impl Board {
     pub fn unoccupied_squares_for_card<'a>(&'a self, card: &'a Card) -> impl Iterator<Item=Square> + 'a {
         Square::playable_squares()
             .filter(|square| {
-                self.card_at(square).contains(card) && self.chip_at(square).is_none()
+                self.card_at(square).wraps(card) && self.chip_at(square).is_none()
             })
     }
 
     // returns true if the given team has a chip at the given square, or it is a corner square
     pub fn counts_for(&self, square: &Square, team: &Team) -> bool {
-        square.is_corner() || self.chip_at(square).contains(team)
+        square.is_corner() || self.chip_at(square).wraps(team)
     }
 
     // returns true if the given square is in a sequence
@@ -231,122 +231,122 @@ pub fn standard_board() -> Board {
         cards: [
             [
                 None,
-                Some(Card { suit: Suit::SPADES, rank: Rank::TWO }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::THREE }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::FOUR }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::FIVE }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::SIX }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::SEVEN }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::EIGHT }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::NINE }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Two }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Three }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Four }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Five }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Six }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Seven }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Eight }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Nine }),
                 None,
             ],
             [
-                Some(Card { suit: Suit::CLUBS, rank: Rank::SIX }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::FIVE }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::FOUR }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::THREE }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::TWO }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::ACE }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::KING }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::QUEEN }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::TEN }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::TEN }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Six }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Five }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Four }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Three }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Two }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Ace }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::King }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Queen }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Ten }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Ten }),
             ],
             [
-                Some(Card { suit: Suit::CLUBS, rank: Rank::SEVEN }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::ACE }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::TWO }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::THREE }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::FOUR }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::FIVE }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::SIX }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::SEVEN }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::NINE }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::QUEEN }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Seven }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Ace }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Two }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Three }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Four }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Five }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Six }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Seven }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Nine }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Queen }),
             ],
             [
-                Some(Card { suit: Suit::CLUBS, rank: Rank::EIGHT }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::KING }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::SIX }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::FIVE }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::FOUR }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::THREE }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::TWO }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::EIGHT }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::EIGHT }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::KING }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Eight }),
+                Some(Card { suit: Suit::Spades, rank: Rank::King }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Six }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Five }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Four }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Three }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Two }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Eight }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Eight }),
+                Some(Card { suit: Suit::Spades, rank: Rank::King }),
             ],
             [
-                Some(Card { suit: Suit::CLUBS, rank: Rank::NINE }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::QUEEN }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::SEVEN }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::SIX }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::FIVE }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::FOUR }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::ACE }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::NINE }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::SEVEN }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::ACE }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Nine }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Queen }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Seven }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Six }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Five }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Four }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Ace }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Nine }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Seven }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Ace }),
             ],
             [
-                Some(Card { suit: Suit::CLUBS, rank: Rank::TEN }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::TEN }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::EIGHT }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::SEVEN }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::TWO }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::THREE }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::KING }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::TEN }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::SIX }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::TWO }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Ten }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Ten }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Eight }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Seven }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Two }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Three }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::King }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Ten }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Six }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Two }),
             ],
             [
-                Some(Card { suit: Suit::CLUBS, rank: Rank::QUEEN }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::NINE }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::NINE }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::EIGHT }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::NINE }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::TEN }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::QUEEN }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::QUEEN }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::FIVE }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::THREE }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Queen }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Nine }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Nine }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Eight }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Nine }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Ten }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Queen }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Queen }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Five }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Three }),
             ],
             [
-                Some(Card { suit: Suit::CLUBS, rank: Rank::KING }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::EIGHT }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::TEN }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::QUEEN }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::KING }),
-                Some(Card { suit: Suit::CLUBS, rank: Rank::ACE }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::ACE }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::KING }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::FOUR }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::FOUR }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::King }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Eight }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Ten }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Queen }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::King }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Ace }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Ace }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::King }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Four }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Four }),
             ],
             [
-                Some(Card { suit: Suit::CLUBS, rank: Rank::ACE }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::SEVEN }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::SIX }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::FIVE }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::FOUR }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::THREE }),
-                Some(Card { suit: Suit::SPADES, rank: Rank::TWO }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::TWO }),
-                Some(Card { suit: Suit::HEARTS, rank: Rank::THREE }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::FIVE }),
+                Some(Card { suit: Suit::Clubs, rank: Rank::Ace }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Seven }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Six }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Five }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Four }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Three }),
+                Some(Card { suit: Suit::Spades, rank: Rank::Two }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Two }),
+                Some(Card { suit: Suit::Hearts, rank: Rank::Three }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Five }),
             ],
             [
                 None,
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::ACE }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::KING }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::QUEEN }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::TEN }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::NINE }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::EIGHT }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::SEVEN }),
-                Some(Card { suit: Suit::DIAMONDS, rank: Rank::SIX }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Ace }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::King }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Queen }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Ten }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Nine }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Eight }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Seven }),
+                Some(Card { suit: Suit::Diamonds, rank: Rank::Six }),
                 None,
             ],
         ],
@@ -384,16 +384,14 @@ mod tests {
         let mut counts = HashMap::new();
 
         for row in board.cards.iter() {
-            for card in row.iter() {
-                if let Some(card) = card {
-                    let count = counts.entry(card).or_insert(0);
-                    *count += 1;
-                }
+            for card in row.iter().flatten() {
+                let count = counts.entry(card).or_insert(0);
+                *count += 1;
             }
         }
 
         for card in Card::standard_deck() {
-            let expected = if card.rank == Rank::JACK { None } else { Some(&2) };
+            let expected = if card.rank == Rank::Jack { None } else { Some(&2) };
             let actual = counts.get(&card);
             assert_eq!(expected, actual, "Card count was unexpected for {}", card);
         }
@@ -402,61 +400,61 @@ mod tests {
     #[test]
     fn create_horizontal_sequence_in_order() {
         let mut board = standard_board();
-        assert_eq!(None, board.add_chip(&Square::from_notation("c4"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c5"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c6"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c7"), Team::ONE));
-        assert_eq!(Some(1), board.add_chip(&Square::from_notation("c8"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c4"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c5"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c6"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c7"), Team::One));
+        assert_eq!(Some(1), board.add_chip(&Square::from_notation("c8"), Team::One));
         board.assert_sequences(vec![vec!["c4", "c5", "c6", "c7", "c8"]]);
     }
 
     #[test]
     fn create_vertical_sequence_with_middle_last() {
         let mut board = standard_board();
-        assert_eq!(None, board.add_chip(&Square::from_notation("h1"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("h2"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("h4"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("h5"), Team::ONE));
-        assert_eq!(Some(1), board.add_chip(&Square::from_notation("h3"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("h1"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("h2"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("h4"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("h5"), Team::One));
+        assert_eq!(Some(1), board.add_chip(&Square::from_notation("h3"), Team::One));
         board.assert_sequences(vec![vec!["h1", "h2", "h3", "h4", "h5"]]);
     }
 
     #[test]
     fn create_diagonal_sequence_using_corner() {
         let mut board = standard_board();
-        assert_eq!(None, board.add_chip(&Square::from_notation("i8"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("h7"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("f5"), Team::ONE));
-        assert_eq!(Some(1), board.add_chip(&Square::from_notation("g6"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("i8"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("h7"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("f5"), Team::One));
+        assert_eq!(Some(1), board.add_chip(&Square::from_notation("g6"), Team::One));
         board.assert_sequences(vec![vec!["i8", "h7", "f5", "g6"]]);
     }
 
     #[test]
     fn create_horizontal_run_with_another_team_blocking() {
         let mut board = standard_board();
-        assert_eq!(None, board.add_chip(&Square::from_notation("c4"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c5"), Team::TWO));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c6"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c7"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c8"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c4"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c5"), Team::Two));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c6"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c7"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c8"), Team::One));
         board.assert_sequences(vec![]);
     }
 
     #[test]
     fn create_two_sequences_without_overlap() {
         let mut board = standard_board();
-        assert_eq!(None, board.add_chip(&Square::from_notation("c4"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c5"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c6"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c7"), Team::ONE));
-        assert_eq!(Some(1), board.add_chip(&Square::from_notation("c8"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c4"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c5"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c6"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c7"), Team::One));
+        assert_eq!(Some(1), board.add_chip(&Square::from_notation("c8"), Team::One));
         board.assert_sequences(vec![vec!["c4", "c5", "c6", "c7", "c8"]]);
 
-        assert_eq!(None, board.add_chip(&Square::from_notation("h1"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("h2"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("h4"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("h5"), Team::ONE));
-        assert_eq!(Some(2), board.add_chip(&Square::from_notation("h3"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("h1"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("h2"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("h4"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("h5"), Team::One));
+        assert_eq!(Some(2), board.add_chip(&Square::from_notation("h3"), Team::One));
         board.assert_sequences(
             vec![
                 vec!["c4", "c5", "c6", "c7", "c8"],
@@ -468,17 +466,17 @@ mod tests {
     #[test]
     fn create_two_sequences_with_single_overlap_in_different_direction() {
         let mut board = standard_board();
-        assert_eq!(None, board.add_chip(&Square::from_notation("c4"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c5"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c6"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c7"), Team::ONE));
-        assert_eq!(Some(1), board.add_chip(&Square::from_notation("c8"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c4"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c5"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c6"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c7"), Team::One));
+        assert_eq!(Some(1), board.add_chip(&Square::from_notation("c8"), Team::One));
         board.assert_sequences(vec![vec!["c4", "c5", "c6", "c7", "c8"]]);
 
-        assert_eq!(None, board.add_chip(&Square::from_notation("a5"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("b5"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("d5"), Team::ONE));
-        assert_eq!(Some(2), board.add_chip(&Square::from_notation("e5"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("a5"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("b5"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("d5"), Team::One));
+        assert_eq!(Some(2), board.add_chip(&Square::from_notation("e5"), Team::One));
         board.assert_sequences(
             vec![
                 vec!["c4", "c5", "c6", "c7", "c8"],
@@ -490,17 +488,17 @@ mod tests {
     #[test]
     fn create_two_sequences_without_single_overlap_in_same_direction() {
         let mut board = standard_board();
-        assert_eq!(None, board.add_chip(&Square::from_notation("c0"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c1"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c2"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c3"), Team::ONE));
-        assert_eq!(Some(1), board.add_chip(&Square::from_notation("c4"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c0"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c1"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c2"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c3"), Team::One));
+        assert_eq!(Some(1), board.add_chip(&Square::from_notation("c4"), Team::One));
         board.assert_sequences(vec![vec!["c0", "c1", "c2", "c3", "c4"]]);
 
-        assert_eq!(None, board.add_chip(&Square::from_notation("c5"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c6"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c7"), Team::ONE));
-        assert_eq!(Some(2), board.add_chip(&Square::from_notation("c8"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c5"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c6"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c7"), Team::One));
+        assert_eq!(Some(2), board.add_chip(&Square::from_notation("c8"), Team::One));
         board.assert_sequences(
             vec![
                 vec!["c0", "c1", "c2", "c3", "c4"],
@@ -516,25 +514,25 @@ mod tests {
     #[test]
     fn create_sequence_with_more_than_5_squares() {
         let mut board = standard_board();
-        assert_eq!(None, board.add_chip(&Square::from_notation("b0"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c0"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("d0"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("f0"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("g0"), Team::ONE));
-        assert_eq!(Some(1), board.add_chip(&Square::from_notation("e0"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("b0"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c0"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("d0"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("f0"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("g0"), Team::One));
+        assert_eq!(Some(1), board.add_chip(&Square::from_notation("e0"), Team::One));
         board.assert_sequences(vec![vec!["b0", "c0", "d0", "e0", "f0", "g0"]]);
     }
 
     #[test]
     fn adding_chip_at_end_of_sequence_does_not_lengthen_it() {
         let mut board = standard_board();
-        assert_eq!(None, board.add_chip(&Square::from_notation("b0"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("c0"), Team::ONE));
-        assert_eq!(None, board.add_chip(&Square::from_notation("d0"), Team::ONE));
-        assert_eq!(Some(1), board.add_chip(&Square::from_notation("e0"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("b0"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("c0"), Team::One));
+        assert_eq!(None, board.add_chip(&Square::from_notation("d0"), Team::One));
+        assert_eq!(Some(1), board.add_chip(&Square::from_notation("e0"), Team::One));
         board.assert_sequences(vec![vec!["b0", "c0", "d0", "e0"]]);
 
-        assert_eq!(None, board.add_chip(&Square::from_notation("f0"), Team::ONE));
+        assert_eq!(None, board.add_chip(&Square::from_notation("f0"), Team::One));
         board.assert_sequences(vec![vec!["b0", "c0", "d0", "e0"]]);
     }
 }

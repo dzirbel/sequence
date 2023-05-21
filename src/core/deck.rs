@@ -1,7 +1,7 @@
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use crate::game::card::Card;
+use crate::core::card::Card;
 
 pub struct Deck {
     draw_pile: Vec<Card>,
@@ -30,7 +30,7 @@ impl Deck {
     }
 
     pub fn discard_pile(&self) -> &[Card] {
-        return &self.discard_pile;
+        &self.discard_pile
     }
 
     pub fn discard(&mut self, card: Card) {
@@ -46,19 +46,25 @@ impl Deck {
     }
 }
 
+impl Default for Deck {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     impl Deck {
-        fn assert_draw_pile_contains(&self, cards: &Vec<Card>) {
+        fn assert_draw_pile_contains(&self, cards: &[Card]) {
             let mut draw_pile_sorted = self.draw_pile.clone();
             draw_pile_sorted.sort();
 
-            let mut cards_sorted = cards.clone();
+            let mut cards_sorted = cards.to_owned();
             cards_sorted.sort();
 
-            assert!(*draw_pile_sorted == cards_sorted);
+            assert!(draw_pile_sorted == cards_sorted);
         }
     }
 
@@ -66,7 +72,7 @@ mod tests {
     fn new_deck_has_two_of_each_card() {
         let deck = Deck::new();
         deck.assert_draw_pile_contains(
-            &Card::standard_deck().chain(Card::standard_deck()).collect()
+            &Card::standard_deck().chain(Card::standard_deck()).collect::<Vec<Card>>()
         );
         assert!(deck.discard_pile().is_empty());
     }

@@ -1,13 +1,10 @@
-use rand::distributions::{Distribution, Uniform};
-use rand::thread_rng;
-
-use crate::game::board::{Board, standard_board};
-use crate::game::card::Card;
-use crate::game::deck::Deck;
-use crate::game::player::Player;
-use crate::game::square::Square;
-use crate::game::team::Team;
-use crate::lib::generate_vector;
+use crate::core::board::{Board, standard_board};
+use crate::core::card::Card;
+use crate::core::deck::Deck;
+use crate::core::player::Player;
+use crate::core::square::Square;
+use crate::core::team::Team;
+use crate::util::generate_vector;
 
 pub struct Game {
     players: Vec<Box<dyn Player>>,
@@ -108,7 +105,7 @@ impl Game {
                 }
 
                 let replaced_card = &self.player_hands[self.up_index].remove(replaced_card_index);
-                self.deck.discard(replaced_card.clone());
+                self.deck.discard(*replaced_card);
                 if !self.board.is_dead(replaced_card) {
                     panic!("replaced card was not dead");
                 }
@@ -208,17 +205,17 @@ impl Game {
         None
     }
 
-    fn up_player(&self) -> &Box<dyn Player> {
-        &self.players[self.up_index]
+    fn up_player(&self) -> &dyn Player {
+        self.players[self.up_index].as_ref()
     }
 
     // gets the team that the player at the given index belongs to
     pub fn player_team(num_teams: usize, player_index: usize) -> Team {
         let team_index = player_index % num_teams;
         match team_index {
-            0 => Team::ONE,
-            1 => Team::TWO,
-            2 => Team::THREE,
+            0 => Team::One,
+            1 => Team::Two,
+            2 => Team::Three,
             _ => panic!("invalid team index (too many teams?)")
         }
     }
