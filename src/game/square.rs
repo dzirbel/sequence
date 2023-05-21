@@ -16,18 +16,6 @@ impl Display for Square {
 }
 
 impl Square {
-    pub fn from_notation(notation: &str) -> Square {
-        if notation.len() != 2 { panic!("invalid notation string: {notation}") }
-
-        let mut chars = notation.chars();
-        let col_char = chars.next().unwrap();
-        let row_char = chars.next().unwrap();
-        Square {
-            col: (col_char as usize).saturating_sub('a' as usize) as u8,
-            row: (row_char as usize).saturating_sub('0' as usize) as u8,
-        }
-    }
-
     pub fn playable_squares() -> impl Iterator<Item=Square> {
         iproduct!(0..BOARD_SIZE, 0..BOARD_SIZE)
             .filter_map(|(row, col)| {
@@ -60,6 +48,20 @@ impl Square {
 #[cfg(test)]
 mod tests {
     use crate::game::square::Square;
+
+    impl Square {
+        pub fn from_notation(notation: &str) -> Square {
+            if notation.len() != 2 { panic!("invalid notation string: {notation}") }
+
+            let mut chars = notation.chars();
+            let col_char = chars.next().unwrap();
+            let row_char = chars.next().unwrap();
+            Square {
+                col: (col_char as usize).saturating_sub('a' as usize) as u8,
+                row: (row_char as usize).saturating_sub('0' as usize) as u8,
+            }
+        }
+    }
 
     #[test]
     fn convert_a0_back_and_forth_from_notation() {
