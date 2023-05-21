@@ -10,7 +10,7 @@ use crate::game::team::Team;
 
 pub struct RandomPlayer {}
 
-fn rand(max: usize) -> usize {
+fn rand(max: u8) -> u8 {
     return Uniform::from(0..max).sample(&mut thread_rng())
 }
 
@@ -21,7 +21,7 @@ fn rand_square() -> Square {
 
     // if a corner was chosen, try again
     // TODO just choose (uniformly!) among the playable squares
-    if !Board::is_playable(&square) {
+    if !square.is_playable() {
         return rand_square()
     }
 
@@ -49,10 +49,10 @@ fn rand_occupied_square_not_in_sequence(board: &Board, excluding_team: &Team) ->
 }
 
 impl Player for RandomPlayer {
-    fn play(&self, team: &Team, board: &Board, hand: &Vec<Card>) -> (usize, Square) {
+    fn play(&self, team: &Team, board: &Board, hand: &Vec<Card>) -> (u8, Square) {
         // choose a random card
-        let card_index = rand(hand.len());
-        let card = hand[card_index];
+        let card_index = rand(hand.len() as u8);
+        let card = hand[card_index as usize];
 
         if card.is_one_eyed_jack() {
             if board.is_empty() {

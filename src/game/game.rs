@@ -134,15 +134,15 @@ impl Game {
         );
 
         let hand_size = self.player_hands[self.up_index].len();
-        if choice_index > hand_size {
+        if choice_index as usize > hand_size {
             panic!("card choice out of bounds: {choice_index} for hand size {}", hand_size)
         }
 
-        if !Board::is_playable(&choice_square) {
+        if !choice_square.is_playable() {
             panic!("invalid square choice: {choice_square}")
         }
 
-        let choice_card = self.player_hands[self.up_index].remove(choice_index);
+        let choice_card = self.player_hands[self.up_index].remove(choice_index as usize);
         self.deck.discard(choice_card);
 
         (choice_card, choice_square)

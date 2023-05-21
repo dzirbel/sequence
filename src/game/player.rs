@@ -11,7 +11,7 @@ pub trait Player {
     // - for one-eyed jacks, removes the claim on that square
     //   - requires that the square is claimed by a different team
     // TODO ideally pass in info about the deck as well (draw size, discard pile)
-    fn play(&self, team: &Team, board: &Board, hand: &Vec<Card>) -> (usize, Square);
+    fn play(&self, team: &Team, board: &Board, hand: &Vec<Card>) -> (u8, Square);
 
     fn replace_dead_card(&self, board: &Board, hand: &Vec<Card>) -> Option<usize> {
         // by default, just pick the first dead card and return it

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
-use itertools::iproduct;
+
+use option_ext::OptionExt;
 
 use crate::game::card::Card;
 use crate::game::rank::Rank;
@@ -7,58 +8,49 @@ use crate::game::square::Square;
 use crate::game::suit::Suit;
 use crate::game::team::Team;
 
-pub const BOARD_SIZE: usize = 10;
-pub const SEQUENCE_LENGTH: usize = 5;
+pub const BOARD_SIZE: u8 = 10;
+pub const SEQUENCE_LENGTH: u8 = 5;
 
 pub struct Board {
-    pub cards: [[Option<Card>; BOARD_SIZE]; BOARD_SIZE],
-    chips: [[Option<Team>; BOARD_SIZE]; BOARD_SIZE],
+    // TODO also have / replace with a hashmap from card to square for performance
+    pub cards: [[Option<Card>; BOARD_SIZE as usize]; BOARD_SIZE as usize],
+    chips: [[Option<Team>; BOARD_SIZE as usize]; BOARD_SIZE as usize],
     sequences: Vec<(Team, HashSet<Square>)>,
 }
 
 impl Board {
-    pub fn is_valid(square: &Square) -> bool {
-        square.row < BOARD_SIZE && square.col < BOARD_SIZE
-    }
-
-    pub fn is_playable(square: &Square) -> bool {
-        Board::is_valid(square) && !Board::is_corner_square(square)
-    }
-
-    pub fn playable_squares() -> impl Iterator<Item=(usize, usize)> {
-        iproduct!(0..BOARD_SIZE, 0..BOARD_SIZE)
-            .filter(|(row, col)| !Board::is_corner(*row, *col))
-    }
-
-    pub fn is_corner(row: usize, col: usize) -> bool {
-        (row == 0 || row == BOARD_SIZE - 1) && (col == 0 || col == BOARD_SIZE - 1)
-    }
-
-    pub fn is_corner_square(square: &Square) -> bool {
-        Board::is_corner(square.row, square.col)
-    }
-
     // returns the card at the given square; None for corners
     pub fn card_at(&self, square: &Square) -> Option<Card> {
-        self.cards[square.row][square.col]
+        self.cards[square.row as usize][square.col as usize]
     }
 
+    // returns the team which has claimed the given square; None if unclaimed (or a corner)
+    pub fn chip_at(&self, square: &Square) -> Option<Team> {
+        return self.chips[square.row as usize][square.col as usize];
+    }
+
+    // returns true if there is a chip on all playable squares
     pub fn is_full(&self) -> bool {
-        Board::playable_squares().all(|(row, col)| self.chips[row][col].is_some())
+        Square::playable_squares().all(|square| self.chip_at(&square).is_some())
     }
 
+    // returns true if there are no chips on the board
     pub fn is_empty(&self) -> bool {
-        Board::playable_squares().all(|(row, col)| self.chips[row][col].is_none())
+        Square::playable_squares().all(|square| self.chip_at(&square).is_none())
     }
 
     // checks if the given card is dead, i.e. not a Jack and both of its squares already have a chip
     pub fn is_dead(&self, card: &Card) -> bool {
         if card.rank == Rank::JACK { return false; }
 
-        !Board::playable_squares()
-            .any(|(row, col)| self.cards[row][col] == Some(*card) && self.chips[row][col].is_none())
+        !Square::playable_squares()
+            .any(|square| self.card_at(&square).contains(card) && self.chip_at(&square).is_none())
     }
 
+    // checks if it is possible to play the given card:
+    // - for one-eyed jacks, true if the board is not empty
+    // - for two-eyed jacks, true if the board is not full
+    // - for regular cards, true if at least one of its squares does not have a chip
     pub fn can_be_played(&self, card: &Card) -> bool {
         if card.is_one_eyed_jack() {
             !self.is_empty()
@@ -71,20 +63,15 @@ impl Board {
 
     // note: returns empty iterator for jacks
     pub fn unoccupied_squares_for_card<'a>(&'a self, card: &'a Card) -> impl Iterator<Item=Square> + 'a {
-        Board::playable_squares()
-            .filter(|(row, col)| {
-                self.cards[*row][*col] == Some(*card) && self.chips[*row][*col].is_none()
+        Square::playable_squares()
+            .filter(|square| {
+                self.card_at(square).contains(card) && self.chip_at(square).is_none()
             })
-            .map(|(row, col)| Square { row, col })
-    }
-
-    pub fn chip_at(&self, square: &Square) -> Option<Team> {
-        return self.chips[square.row][square.col];
     }
 
     // returns true if the given team has a chip at the given square, or it is a corner square
-    pub fn counts_for(&self, square: &Square, team: Team) -> bool {
-        Board::is_corner_square(square) || self.chip_at(square) == Some(team)
+    pub fn counts_for(&self, square: &Square, team: &Team) -> bool {
+        square.is_corner() || self.chip_at(square).contains(team)
     }
 
     // returns true if the given square is in a sequence
@@ -93,7 +80,7 @@ impl Board {
     }
 
     pub fn remove_chip(&mut self, square: &Square) {
-        if !Board::is_playable(square) {
+        if !square.is_playable() {
             panic!("attempted to remove chip at non-playable square {square}")
         }
 
@@ -101,12 +88,12 @@ impl Board {
             panic!("attempted to remove a chip in a sequence")
         }
 
-        self.chips[square.row][square.col] = None
+        self.chips[square.row as usize][square.col as usize] = None
     }
 
     // returns the number of sequences owned by team if new one(s) were created
     pub fn add_chip(&mut self, square: &Square, team: Team) -> Option<usize> {
-        if !Board::is_playable(square) {
+        if !square.is_playable() {
             panic!("attempted to place chip at non-playable square {square}")
         }
 
@@ -114,7 +101,7 @@ impl Board {
             panic!("attempted to place chip with a chip already present at {square}")
         }
 
-        self.chips[square.row][square.col] = Some(team);
+        self.chips[square.row as usize][square.col as usize] = Some(team);
         self.find_new_sequences(square, team)
     }
 
@@ -125,7 +112,7 @@ impl Board {
     pub fn print_with_highlighted_cards(&self, cards: &HashSet<Card>) {
         for (i, row) in self.cards.iter().enumerate() {
             for (j, card) in row.iter().enumerate() {
-                let square = Square { row: i, col: j };
+                let square = Square { row: i as u8, col: j as u8 };
                 let card_str = match card {
                     None => String::from("--"),
                     Some(c) => format!("{}", c),
@@ -174,15 +161,15 @@ impl Board {
             squares.insert(*source_square);
 
             // returns true if we can keep continuing in that direction, false to stop
-            let mut check = |square| -> bool {
-                if Board::is_valid(&square) && self.counts_for(&square, team) {
+            let mut check = |square: Square| -> bool {
+                if square.is_valid() && self.counts_for(&square, &team) {
                     if self.in_sequence(&square) {
                         if used_existing_sequence { return false; }
                         used_existing_sequence = true;
                     }
 
                     length += 1;
-                    if !Board::is_corner_square(&square) {
+                    if !square.is_corner() {
                         squares.insert(square);
                     }
                     true
@@ -239,7 +226,7 @@ impl Board {
 */
 pub fn standard_board() -> Board {
     Board {
-        chips: [[None; BOARD_SIZE]; BOARD_SIZE],
+        chips: [[None; BOARD_SIZE as usize]; BOARD_SIZE as usize],
         sequences: Vec::new(),
         cards: [
             [
