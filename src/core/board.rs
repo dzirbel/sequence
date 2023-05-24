@@ -139,9 +139,10 @@ impl Board {
     // - for one-eyed jacks, true if the board is not empty
     // - for two-eyed jacks, true if the board is not full
     // - for regular cards, true if at least one of its squares does not have a chip
-    pub fn can_be_played(&self, card: &Card) -> bool {
+    pub fn can_be_played(&self, card: &Card, team: &Team) -> bool {
         if card.is_one_eyed_jack() {
-            !self.is_empty()
+            // playable if there are any chips from other teams
+            self.team_to_squares.iter().any(|(t, _)| t != team)
         } else if card.is_two_eyed_jack() {
             !self.is_full()
         } else {
