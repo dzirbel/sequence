@@ -115,8 +115,9 @@ impl Game {
             }
         }
 
+        let team = Game::player_team(self.num_teams, self.up_index);
         self.player_hands[self.up_index].iter()
-            .any(|card| self.board.can_be_played(card))
+            .any(|card| self.board.can_be_played(card, &team))
     }
 
     fn play_card(&mut self) -> (Card, Square) {
@@ -128,10 +129,9 @@ impl Game {
             &self.deck,
         );
 
-        let hand_size = self.player_hands[self.up_index].len();
         debug_assert!(
-            choice_index as usize <= hand_size,
-            "card choice out of bounds: {choice_index} for hand size {}", hand_size,
+            choice_index as usize <= self.player_hands[self.up_index].len(),
+            "card choice out of bounds",
         );
         debug_assert!(
             choice_square.is_playable(),
@@ -225,5 +225,23 @@ impl Game {
             12 => 3,
             _ => panic!("unsupported number of players: {num_players}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::players::deterministic_player::DeterministicPlayer;
+    use super::*;
+
+    // TODO avoid use of RNG in the game deck
+    #[test]
+    fn deterministic_game_runs_without_panics() {
+        let players: Vec<Box<dyn Player>> = vec![
+            Box::new(DeterministicPlayer{}),
+            Box::new(DeterministicPlayer{}),
+        ];
+
+        let mut game = Game::new(players, 2);
+        game.run(false);
     }
 }
