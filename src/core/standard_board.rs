@@ -1,4 +1,4 @@
-use crate::core::board::{Board, BOARD_SIZE};
+use crate::core::board::Board;
 use crate::core::card::Card;
 use crate::core::rank::Rank;
 use crate::core::suit::Suit;
@@ -16,11 +16,9 @@ impl Board {
     | a8 A♣ | b8 7♠ | c8 6♠ | d8 5♠ | e8 4♠ | f8 3♠ | g8 2♠ | h8 2♥ | i8 3♥ | j8 5♦ |
     | a9 -- | b9 A♦ | c9 K♦ | d9 Q♦ | e9 T♦ | f9 9♦ | g9 8♦ | h9 7♦ | i9 6♦ | j9 -- |
     */
-    pub fn new() -> Board {
-        Board {
-            chips: [[None; BOARD_SIZE as usize]; BOARD_SIZE as usize],
-            sequences: Vec::new(),
-            cards: [
+    pub fn standard_board() -> Board {
+        Board::new(
+            [
                 [
                     None,
                     Some(Card { suit: Suit::Spades, rank: Rank::Two }),
@@ -142,13 +140,13 @@ impl Board {
                     None,
                 ],
             ],
-        }
+        )
     }
 }
 
 impl Default for Board {
     fn default() -> Self {
-        Board::new()
+        Board::standard_board()
     }
 }
 
@@ -156,18 +154,18 @@ impl Default for Board {
 mod tests {
     use std::collections::HashMap;
 
+    use crate::core::square::Square;
+
     use super::*;
 
     #[test]
     fn standard_board_has_two_copies_of_each_card_except_jacks() {
-        let board = Board::new();
+        let board = Board::standard_board();
         let mut counts = HashMap::new();
 
-        for row in board.cards.iter() {
-            for card in row.iter().flatten() {
-                let count = counts.entry(card).or_insert(0);
-                *count += 1;
-            }
+        for square in Square::playable_squares() {
+            let card = board.card_at(&square).unwrap();
+            counts.entry(card).and_modify(|c| *c += 1).or_insert(1);
         }
 
         for card in Card::standard_deck() {

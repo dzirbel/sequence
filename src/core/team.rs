@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter, Result};
 
 use strum_macros::EnumIter;
 
-#[derive(Clone, Copy, EnumIter, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, EnumIter, Eq, Hash, PartialEq)]
 pub enum Team {
     One,
     Two,

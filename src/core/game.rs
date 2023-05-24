@@ -21,14 +21,14 @@ impl Game {
     // creates a new game
     // TODO pass through same RNG source to deck
     pub fn new(players: Vec<Box<dyn Player>>, num_teams: usize) -> Game {
-        if num_teams % players.len() != 0 {
-            panic!("invalid number of teams: {} for {} players", num_teams, players.len())
-        }
-
-        let hand_size = Game::hand_size(players.len());
+        debug_assert!(
+            num_teams % players.len() == 0,
+            "invalid number of teams: {} for {} players", num_teams, players.len(),
+        );
 
         let mut deck = Deck::new();
 
+        let hand_size = Game::hand_size(players.len());
         let player_hands = generate_vector(players.len(), |_| {
             generate_vector(hand_size, |_| deck.draw())
         });
@@ -38,7 +38,7 @@ impl Game {
             num_teams,
             up_index: 0, // use given player order
             player_hands,
-            board: Board::new(),
+            board: Board::standard_board(),
             deck,
             turn_count: 0,
         }
@@ -77,6 +77,7 @@ impl Game {
             self.board.print();
         }
 
+        // likely moot, but don't finish the turn count when the game is over
         if result.is_some() {
             return result;
         }
@@ -97,18 +98,12 @@ impl Game {
         if hand.iter().any(|card| self.board.is_dead(card)) {
             let replaced_card_choice = self.up_player().replace_dead_card(&self.board, hand);
             if let Some(replaced_card_index) = replaced_card_choice {
-                if replaced_card_index > hand.len() {
-                    panic!(
-                        "dead card choice out of bounds: {replaced_card_index} \
-                        for hand size {}", hand.len()
-                    );
-                }
+                debug_assert!(replaced_card_index <= hand.len(), "dead card choice out of bounds");
 
                 let replaced_card = &self.player_hands[self.up_index].remove(replaced_card_index);
+                debug_assert!(self.board.is_dead(replaced_card), "replaced card was not dead");
+
                 self.deck.discard(*replaced_card);
-                if !self.board.is_dead(replaced_card) {
-                    panic!("replaced card was not dead");
-                }
 
                 if print {
                     println!("Turn {}: player {} replaced dead card {}",
@@ -134,13 +129,14 @@ impl Game {
         );
 
         let hand_size = self.player_hands[self.up_index].len();
-        if choice_index as usize > hand_size {
-            panic!("card choice out of bounds: {choice_index} for hand size {}", hand_size)
-        }
-
-        if !choice_square.is_playable() {
-            panic!("invalid square choice: {choice_square}")
-        }
+        debug_assert!(
+            choice_index as usize <= hand_size,
+            "card choice out of bounds: {choice_index} for hand size {}", hand_size,
+        );
+        debug_assert!(
+            choice_square.is_playable(),
+            "invalid square choice: {choice_square}",
+        );
 
         let choice_card = self.player_hands[self.up_index].remove(choice_index as usize);
         self.deck.discard(choice_card);
@@ -150,16 +146,11 @@ impl Game {
 
     fn place_chip(&mut self, card: Card, square: Square, print: bool) -> Option<Team> {
         let player_team = Game::player_team(self.num_teams, self.up_index);
-        let current_claim = self.board.chip_at(&square);
         if card.is_one_eyed_jack() {
-            match current_claim {
-                None => panic!("attempted to remove chip on unclaimed square {square}"),
-                Some(team) => {
-                    if team == player_team {
-                        panic!("attempted to remove chip on own team's square {square}")
-                    }
-                }
-            }
+            debug_assert!(
+                self.board.chip_at(&square).unwrap() != player_team,
+                "attempted to remove chip on own team's square {}", square,
+            );
 
             self.board.remove_chip(&square);
             if print {
@@ -172,17 +163,10 @@ impl Game {
                 );
             }
         } else {
-            match current_claim {
-                Some(_) => panic!("attempted to put chip on claimed square {square}"),
-                None => {
-                    if !card.is_two_eyed_jack() && Some(card) != self.board.card_at(&square) {
-                        panic!(
-                            "attempted to put chip on square not matching the \
-                            chosen card {card}: {square}"
-                        )
-                    }
-                }
-            }
+            debug_assert!(
+                card.is_two_eyed_jack() || self.board.card_at(&square).unwrap() == card,
+                "attempted to put chip on square not matching the chosen card {}: {}", card, square,
+            );
 
             if print {
                 println!(
@@ -194,8 +178,7 @@ impl Game {
                 );
             }
 
-            let new_sequence = self.board.add_chip(&square, player_team);
-            if let Some(sequences) = new_sequence {
+            if let Some(sequences) = self.board.add_chip(&square, player_team) {
                 if sequences >= Game::winning_sequences(self.num_teams) {
                     return Some(player_team)
                 }

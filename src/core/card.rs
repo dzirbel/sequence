@@ -6,7 +6,7 @@ use strum::IntoEnumIterator;
 use crate::core::rank::Rank;
 use crate::core::suit::Suit;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Card {
     pub rank: Rank,
     pub suit: Suit,

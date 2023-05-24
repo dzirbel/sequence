@@ -48,10 +48,13 @@ impl Player for RandomPlayer {
             }
             (card_index as u8, rand_unoccupied_square(board))
         } else {
-            let squares = board.unoccupied_squares_for_card(card);
-            let square_choice = squares.choose(&mut thread_rng());
+            let squares = board.squares_for_card(card).unwrap();
+            let square_choice = squares
+                .iter()
+                .filter(|square| board.chip_at(square).is_none())
+                .choose(&mut thread_rng());
             if let Some(square) = square_choice {
-                (card_index as u8, square)
+                (card_index as u8, *square)
             } else {
                 // attempted to play a dead card; try again
                 self.play(team, hand, board, _deck)
