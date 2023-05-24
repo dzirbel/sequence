@@ -4,6 +4,7 @@ use crate::core::deck::Deck;
 use crate::core::player::Player;
 use crate::core::square::Square;
 use crate::core::team::Team;
+use crate::log::Log;
 use crate::util::generate_vector;
 
 pub struct Game {
@@ -15,6 +16,11 @@ pub struct Game {
     player_hands: Vec<Vec<Card>>,
     board: Board,
     deck: Deck,
+}
+
+pub struct GameResult {
+    pub winner: Team,
+    pub turns: usize,
 }
 
 impl Game {
@@ -44,25 +50,24 @@ impl Game {
         }
     }
 
-    pub fn run(&mut self, print_turns: bool) -> Team {
+    pub fn run(&mut self) -> GameResult {
         loop {
-            if let Some(winner) = self.run_turn(print_turns) {
+            if let Some(winner) = self.run_turn() {
                 return winner;
             }
         }
     }
 
-    pub fn run_turn(&mut self, print_turn: bool) -> Option<Team> {
+    pub fn run_turn(&mut self) -> Option<GameResult> {
+        self.turn_count += 1;
+
         // optionally replace a dead card
-        let has_playable_card = self.replace_dead_card(print_turn);
+        let has_playable_card = self.replace_dead_card();
         if !has_playable_card {
-            if print_turn {
-                println!("Turn {}: player {} has no playable cards; skipping turn",
-                         self.turn_count, self.up_index);
-            }
+            Log::Turn.log(&format!("Turn {}: player {} has no playable cards; skipping turn",
+                                   self.turn_count, self.up_index));
 
             self.up_index = (self.up_index + 1) % self.players.len();
-            self.turn_count += 1;
 
             return None;
         }
@@ -71,15 +76,13 @@ impl Game {
         let (choice_card, choice_square) = self.play_card();
 
         // place the chip on the board and check victory conditions
-        let result = self.place_chip(choice_card, choice_square, print_turn);
+        let result = self.place_chip(choice_card, choice_square);
 
-        if print_turn {
-            self.board.print();
-        }
+        Log::Board.if_logged(|| self.board.print());
 
         // likely moot, but don't finish the turn count when the game is over
-        if result.is_some() {
-            return result;
+        if let Some(winner) = result {
+            return Some(GameResult { winner, turns: self.turn_count });
         }
 
         // draw a new card
@@ -87,13 +90,12 @@ impl Game {
 
         // advance turn counters
         self.up_index = (self.up_index + 1) % self.players.len();
-        self.turn_count += 1;
 
         None
     }
 
     // returns true if the player has any playable cards
-    fn replace_dead_card(&mut self, print: bool) -> bool {
+    fn replace_dead_card(&mut self) -> bool {
         let hand = &self.player_hands[self.up_index];
         if hand.iter().any(|card| self.board.is_dead(card)) {
             let replaced_card_choice = self.up_player().replace_dead_card(&self.board, hand);
@@ -105,10 +107,8 @@ impl Game {
 
                 self.deck.discard(*replaced_card);
 
-                if print {
-                    println!("Turn {}: player {} replaced dead card {}",
-                             self.turn_count, self.up_index, replaced_card);
-                }
+                Log::Turn.log(&format!("Turn {}: player {} replaced dead card {}",
+                                       self.turn_count, self.up_index, replaced_card));
 
                 let new_card = self.deck.draw();
                 self.player_hands[self.up_index].push(new_card);
@@ -144,7 +144,7 @@ impl Game {
         (choice_card, choice_square)
     }
 
-    fn place_chip(&mut self, card: Card, square: Square, print: bool) -> Option<Team> {
+    fn place_chip(&mut self, card: Card, square: Square) -> Option<Team> {
         let player_team = Game::player_team(self.num_teams, self.up_index);
         if card.is_one_eyed_jack() {
             debug_assert!(
@@ -153,30 +153,30 @@ impl Game {
             );
 
             self.board.remove_chip(&square);
-            if print {
-                println!(
+            Log::Turn.log(
+                &format!(
                     "Turn {}: player {} played {}, a one-eyed Jack, and removed the chip on {}",
                     self.turn_count,
                     self.up_index,
                     card,
                     square,
-                );
-            }
+                ),
+            );
         } else {
             debug_assert!(
                 card.is_two_eyed_jack() || self.board.card_at(&square).unwrap() == card,
                 "attempted to put chip on square not matching the chosen card {}: {}", card, square,
             );
 
-            if print {
-                println!(
+            Log::Turn.log(
+                &format!(
                     "Turn {}: player {} played {} on {}",
                     self.turn_count,
                     self.up_index,
                     card,
                     square,
-                );
-            }
+                ),
+            );
 
             if let Some(sequences) = self.board.add_chip(&square, player_team) {
                 if sequences >= Game::winning_sequences(self.num_teams) {
@@ -242,6 +242,6 @@ mod tests {
         ];
 
         let mut game = Game::new(players, 2);
-        game.run(false);
+        game.run();
     }
 }
