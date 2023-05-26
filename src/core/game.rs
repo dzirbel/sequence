@@ -4,7 +4,7 @@ use crate::core::deck::Deck;
 use crate::core::player::Player;
 use crate::core::square::Square;
 use crate::core::team::Team;
-use crate::log::Log;
+use crate::log::LogLevel;
 use crate::util::generate_vector;
 
 pub struct Game {
@@ -64,8 +64,8 @@ impl Game {
         // optionally replace a dead card
         let has_playable_card = self.replace_dead_card();
         if !has_playable_card {
-            Log::Turn.log(&format!("Turn {}: player {} has no playable cards; skipping turn",
-                                   self.turn_count, self.up_index));
+            LogLevel::Turn.log(&format!("Turn {}: player {} has no playable cards; skipping turn",
+                                        self.turn_count, self.up_index));
 
             self.up_index = (self.up_index + 1) % self.players.len();
 
@@ -78,7 +78,7 @@ impl Game {
         // place the chip on the board and check victory conditions
         let result = self.place_chip(choice_card, choice_square);
 
-        Log::Board.if_logged(|| self.board.print());
+        LogLevel::Board.if_logged(|| self.board.print());
 
         // likely moot, but don't finish the turn count when the game is over
         if let Some(winner) = result {
@@ -107,8 +107,8 @@ impl Game {
 
                 self.deck.discard(*replaced_card);
 
-                Log::Turn.log(&format!("Turn {}: player {} replaced dead card {}",
-                                       self.turn_count, self.up_index, replaced_card));
+                LogLevel::Turn.log(&format!("Turn {}: player {} replaced dead card {}",
+                                            self.turn_count, self.up_index, replaced_card));
 
                 let new_card = self.deck.draw();
                 self.player_hands[self.up_index].push(new_card);
@@ -153,7 +153,7 @@ impl Game {
             );
 
             self.board.remove_chip(&square);
-            Log::Turn.log(
+            LogLevel::Turn.log(
                 &format!(
                     "Turn {}: player {} played {}, a one-eyed Jack, and removed the chip on {}",
                     self.turn_count,
@@ -168,7 +168,7 @@ impl Game {
                 "attempted to put chip on square not matching the chosen card {}: {}", card, square,
             );
 
-            Log::Turn.log(
+            LogLevel::Turn.log(
                 &format!(
                     "Turn {}: player {} played {} on {}",
                     self.turn_count,
@@ -180,7 +180,7 @@ impl Game {
 
             if let Some(sequences) = self.board.add_chip(&square, player_team) {
                 if sequences >= Game::winning_sequences(self.num_teams) {
-                    return Some(player_team)
+                    return Some(player_team);
                 }
             }
         }
@@ -237,8 +237,8 @@ mod tests {
     #[test]
     fn deterministic_game_runs_without_panics() {
         let players: Vec<Box<dyn Player>> = vec![
-            Box::new(DeterministicPlayer{}),
-            Box::new(DeterministicPlayer{}),
+            Box::new(DeterministicPlayer {}),
+            Box::new(DeterministicPlayer {}),
         ];
 
         let mut game = Game::new(players, 2);
