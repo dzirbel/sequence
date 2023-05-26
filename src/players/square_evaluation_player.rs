@@ -9,6 +9,7 @@ use crate::core::deck::Deck;
 use crate::core::player::Player;
 use crate::core::square::Square;
 use crate::core::team::Team;
+use crate::players::random_player::rand_occupied_square_not_in_sequence;
 use crate::util::wrapper::Wrapper;
 
 pub struct SquareEvaluationPlayer {
@@ -143,6 +144,21 @@ impl Player for SquareEvaluationPlayer {
                     .map(|square| (index as u8, *square))
             })
             .unwrap_or_else(|| {
+                if two_eyed_jack_index.is_none() || board.is_full() {
+                    // no two eyed jack and no normal card can be played -> only have dead cards and
+                    // one eyed jacks; for now play a one-eyed jack on a random square
+
+                    let one_eyed_jack_index: usize = hand.iter()
+                        .enumerate()
+                        .find(|(_, card)| card.is_one_eyed_jack())
+                        .map(|(index, _)| index)
+                        .unwrap();
+                    let square = rand_occupied_square_not_in_sequence(board, team)
+                        .unwrap();
+
+                    return (one_eyed_jack_index as u8, square);
+                }
+
                 let index = two_eyed_jack_index.unwrap() as u8;
                 let square = best_squares.into_iter().next().unwrap_or_else(|| {
                     // no best squares -> only playable card is a two-eyed jack, but no square met
