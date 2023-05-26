@@ -15,6 +15,14 @@ pub struct SquareEvaluationPlayer {
     pub two_eyed_jack_cutoff: i32,
 }
 
+impl Default for SquareEvaluationPlayer {
+    fn default() -> Self {
+        SquareEvaluationPlayer {
+            two_eyed_jack_cutoff: 50,
+        }
+    }
+}
+
 impl Board {
     fn normally_playable_squares(&self, cards: &[Card]) -> HashSet<Square> {
         let mut squares = HashSet::new();
