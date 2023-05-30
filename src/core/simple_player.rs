@@ -20,7 +20,7 @@ impl<T> Player for T where T: SimplePlayer {
         let index = if board.chip_at(&square).is_some() {
             // if there is a chip on the square, find a one-eyed jack to remove it (assumes that
             // it is a chip from another team; if not this will be caught by game logic)
-            hand.into_iter().position(|card| card.is_one_eyed_jack()).unwrap()
+            hand.iter().position(|card| card.is_one_eyed_jack()).unwrap()
         } else {
             hand.iter()
                 // find index of regular card which can be played on the requested square
