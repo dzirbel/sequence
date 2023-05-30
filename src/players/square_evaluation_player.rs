@@ -3,14 +3,14 @@ use std::collections::HashSet;
 
 use itertools::Itertools;
 
-use crate::core::board::{Board, SEQUENCE_LENGTH};
+use crate::core::board::Board;
 use crate::core::card::Card;
 use crate::core::deck::Deck;
-use crate::core::player::Player;
+use crate::core::grid_traversal::open_runs_for_team;
+use crate::core::simple_player::SimplePlayer;
 use crate::core::square::Square;
 use crate::core::team::Team;
 use crate::players::random_player::rand_occupied_square_not_in_sequence;
-use crate::util::wrapper::Wrapper;
 
 pub struct SquareEvaluationPlayer {
     pub two_eyed_jack_cutoff: i32,
@@ -19,73 +19,46 @@ pub struct SquareEvaluationPlayer {
 impl Default for SquareEvaluationPlayer {
     fn default() -> Self {
         SquareEvaluationPlayer {
-            two_eyed_jack_cutoff: 50,
+            two_eyed_jack_cutoff: 100,
         }
     }
 }
 
 impl Board {
     fn normally_playable_squares(&self, cards: &[Card]) -> HashSet<Square> {
-        let mut squares = HashSet::new();
-        for card in cards {
-            if let Some(card_squares) = self.squares_for_card(card) {
-                for square in card_squares {
-                    squares.insert(square);
-                }
-            }
-        }
-
-        squares
+        cards.iter()
+            .flat_map(|card| self.squares_for_card(card))
+            .flatten()
+            .collect()
     }
 }
 
 impl SquareEvaluationPlayer {
     fn evaluate_empty_square(square: &Square, team: &Team, hand: &[Card], board: &Board) -> i32 {
-        let mut score = 0;
+        let mut score: i32 = 0;
         let normal_squares: HashSet<Square> = board.normally_playable_squares(hand);
 
-        let directions = [
-            (0i8, 1i8),
-            (1i8, 1i8),
-            (1i8, 0i8),
-            (1i8, -1i8),
-        ];
+        // TODO if the run has length less than the max sequence length, give it no points
+        for run in open_runs_for_team(board, square, team) {
+            for run_square in run {
+                let value: f32 = if board.counts_for(&run_square, team) {
+                    10.0
+                } else if normal_squares.contains(&run_square) {
+                    2.5
+                } else {
+                    0.5
+                };
 
-        // TODO consolidate traversal logic
-        for (row_delta, col_delta) in directions {
-            for i in 1..=SEQUENCE_LENGTH {
-                let square = square.plus((i as i8) * row_delta, (i as i8) * col_delta);
-                if !square.is_valid() { break }
-
-                let chip = board.chip_at(&square);
-                if square.is_corner() || chip.wraps(team) {
-                    score += 10;
-                } else if chip.is_some() {
-                    break;
-                } else if normal_squares.contains(&square) {
-                    score += 5;
-                }
-            }
-
-            for i in 1..=SEQUENCE_LENGTH {
-                let square = square.plus(-(i as i8) * row_delta, -(i as i8) * col_delta);
-                if !square.is_valid() { break }
-
-                let chip = board.chip_at(&square);
-                if square.is_corner() || chip.wraps(team) {
-                    score += 10;
-                } else if chip.is_some() {
-                    break;
-                } else if normal_squares.contains(&square) {
-                    score += 5;
-                }
+                let dist = SquareEvaluationPlayer::sequence_distance(square, &run_square).unwrap() as f32;
+                let dist_multiplier = (dist - 1.0) * 0.05;
+                score += (value / (1.0 + dist_multiplier)) as i32;
             }
         }
 
         score
     }
 
-    #[allow(dead_code)] // TODO extract and test
+    // TODO extract and test
     fn sequence_distance(square1: &Square, square2: &Square) -> Option<u8> {
         let row_diff = square1.row.abs_diff(square2.row);
         let col_diff = square1.col.abs_diff(square2.col);
@@ -97,77 +70,163 @@ impl SquareEvaluationPlayer {
     }
 }
 
-impl Player for SquareEvaluationPlayer {
+impl SimplePlayer for SquareEvaluationPlayer {
     // TODO play one-eyed jacks if evaluation of a square for another team is above a threshold
-    fn play(&self, team: &Team, hand: &[Card], board: &Board, _deck: &Deck) -> (u8, Square) {
+    fn play_square(&self, team: &Team, hand: &[Card], board: &Board, _deck: &Deck) -> Square {
+        // if there are no open squares, return a random square for a one-eyed jack to remove
+        if board.is_full() {
+            return rand_occupied_square_not_in_sequence(board, team).unwrap();
+        }
+
         let normal_squares: HashSet<Square> = board.normally_playable_squares(hand);
 
         let two_eyed_jack_index: Option<usize> = hand.iter()
-            .enumerate()
-            .find(|(_, card)| card.is_two_eyed_jack())
-            .map(|(index, _)| index);
+            .position(|card| card.is_two_eyed_jack());
 
-        // TODO these are already iterators, no need to collect/clone and then re-iterate them
-        let playable_squares = if two_eyed_jack_index.is_some() {
-            Square::playable_squares().collect()
-        } else {
-            normal_squares.clone()
-        };
+        let playable_squares: Box<dyn Iterator<Item=Square>> =
+            if two_eyed_jack_index.is_some() {
+                Box::new(Square::playable_squares())
+            } else {
+                Box::new(normal_squares.clone().into_iter())
+            };
+
+        let square_evaluations: Vec<(Square, i32)> = playable_squares
+            .filter(|square| board.chip_at(square).is_none())
+            .map(|square| {
+                (square, SquareEvaluationPlayer::evaluate_empty_square(&square, team, hand, board))
+            })
+            .collect();
 
         // set of squares with tied maximum evaluation
         let best_squares: HashSet<Square> = HashSet::from_iter(
-            playable_squares
-                .iter()
-                .filter(|square| board.chip_at(square).is_none())
-                .map(|square| {
-                    let evaluation = SquareEvaluationPlayer::evaluate_empty_square(
-                        square, team, hand, board);
-                    (square, evaluation)
-                })
+            square_evaluations.iter()
                 .filter(|(square, evaluation)| {
                     *evaluation >= self.two_eyed_jack_cutoff || normal_squares.contains(square)
                 })
                 .max_set_by_key(|(_, evaluation)| *evaluation)
-                .iter()
-                .map(|(square, _)| **square)
+                .into_iter()
+                .map(|(square, _)| *square)
         );
 
-        // find an arbitrary normal card which can be played on one of the best squares, if there is
-        // one
-        hand.iter()
-            .enumerate()
-            .find_map(|(index, card)| {
-                board.squares_for_card(card)
-                    .iter()
-                    .filter_map(|squares| squares.intersection(&best_squares).next())
-                    .next()
-                    .map(|square| (index as u8, *square))
-            })
-            .unwrap_or_else(|| {
-                if two_eyed_jack_index.is_none() || board.is_full() {
-                    // no two eyed jack and no normal card can be played -> only have dead cards and
-                    // one eyed jacks; for now play a one-eyed jack on a random square
+        // if we could not find any squares to evaluate, all our normal cards are dead. then either:
+        // 1. we have a two-eyed jack, but there are no squares with an evaluation above the
+        //    threshold
+        // 2. we have no two-eyed jack, and must play a one-eyed jack
+        if best_squares.is_empty() {
+            return if two_eyed_jack_index.is_some() {
+                // (1) choose the bets square for the two-eyed jack
+                square_evaluations.into_iter()
+                    .max_by_key(|(_, evaluation)| *evaluation)
+                    .map(|(square, _)| square)
+                    .unwrap()
+            } else {
+                // (2) choose a random square for the one-eyed jack
+                rand_occupied_square_not_in_sequence(board, team).unwrap()
+            };
+        }
 
-                    let one_eyed_jack_index: usize = hand.iter()
-                        .enumerate()
-                        .find(|(_, card)| card.is_one_eyed_jack())
-                        .map(|(index, _)| index)
-                        .unwrap();
-                    let square = rand_occupied_square_not_in_sequence(board, team)
-                        .unwrap();
+        if let Some(square) = best_squares.iter().find(|square| normal_squares.contains(square)) {
+            // if any of the best squares is playable by a normal card, play it
+            *square
+        } else {
+            // otherwise, pick an arbitrary best square and play it (with a two-eyed jack)
+            best_squares.into_iter().next().unwrap()
+        }
+    }
+}
 
-                    return (one_eyed_jack_index as u8, square);
-                }
+#[cfg(test)]
+mod tests {
+    use crate::core::player::Player;
+    use crate::core::rank::Rank;
+    use crate::core::suit::Suit;
+    use super::*;
 
-                let index = two_eyed_jack_index.unwrap() as u8;
-                let square = best_squares.into_iter().next().unwrap_or_else(|| {
-                    // no best squares -> only playable card is a two-eyed jack, but no square met
-                    // the threshold to play a two eyed jack; choose an arbitrary square
-                    Square::playable_squares()
-                        .find(|square| board.chip_at(square).is_none())
-                        .unwrap()
-                });
-                (index, square)
-            })
+    #[test]
+    fn plays_card_near_existing_chip() {
+        let mut board = Board::standard_board();
+        let deck = Deck::default();
+        let player = SquareEvaluationPlayer::default();
+
+        board.add_chip(&Square::from_notation("e0"), Team::One);
+        // 3 and 4 of clubs are never in line with a corner square
+        let hand = vec![
+            Card { rank: Rank::Three, suit: Suit::Clubs },
+            Card { rank: Rank::Four, suit: Suit::Clubs },
+        ];
+
+        let (index, square) = player.play(&Team::One, &hand, &board, &deck);
+        assert_eq!(index, 0);
+        assert_eq!(square, Square::from_notation("d1"));
+    }
+
+    #[test]
+    fn plays_card_near_corner() {
+        let board = Board::standard_board();
+        let deck = Deck::default();
+        let player = SquareEvaluationPlayer::default();
+
+        // 3 and 4 of clubs are never in line with a corner square
+        let hand = vec![
+            Card { rank: Rank::Three, suit: Suit::Clubs },
+            Card { rank: Rank::Four, suit: Suit::Clubs },
+            Card { rank: Rank::Three, suit: Suit::Diamonds },
+        ];
+
+        let (index, square) = player.play(&Team::One, &hand, &board, &deck);
+        assert_eq!(index, 2);
+        assert_eq!(square, Square::from_notation("j6"));
+    }
+
+    #[test]
+    fn plays_card_with_more_nearby_chips() {
+        let mut board = Board::standard_board();
+        let deck = Deck::default();
+        let player = SquareEvaluationPlayer::default();
+
+        // run near the 3 of clubs on d1
+        board.add_chip(&Square::from_notation("d3"), Team::One);
+        board.add_chip(&Square::from_notation("d4"), Team::One);
+        board.add_chip(&Square::from_notation("d5"), Team::One);
+
+        // single chip near the 4 of clubs on c1
+        board.add_chip(&Square::from_notation("b2"), Team::One);
+
+        let hand = vec![
+            Card { rank: Rank::Three, suit: Suit::Clubs },
+            Card { rank: Rank::Four, suit: Suit::Clubs },
+        ];
+
+        let (index, square) = player.play(&Team::One, &hand, &board, &deck);
+        assert_eq!(index, 0);
+        assert_eq!(square, Square::from_notation("d1"));
+    }
+
+    #[test]
+    fn does_not_play_card_near_blocked_run() {
+        let mut board = Board::standard_board();
+        let deck = Deck::default();
+        let player = SquareEvaluationPlayer::default();
+
+        // run up to the 3 of clubs on d1 is blocked
+        board.add_chip(&Square::from_notation("d2"), Team::Two);
+        board.add_chip(&Square::from_notation("d3"), Team::One);
+        board.add_chip(&Square::from_notation("d4"), Team::One);
+        board.add_chip(&Square::from_notation("d5"), Team::One);
+
+        // single chip near the 4 of clubs on c1
+        board.add_chip(&Square::from_notation("b2"), Team::One);
+
+        // block the second option for the 4 of clubs
+        board.add_chip(&Square::from_notation("e3"), Team::Three);
+
+        let hand = vec![
+            Card { rank: Rank::Three, suit: Suit::Clubs },
+            Card { rank: Rank::Four, suit: Suit::Clubs },
+        ];
+
+        let (index, square) = player.play(&Team::One, &hand, &board, &deck);
+        assert_eq!(index, 1);
+        assert_eq!(square, Square::from_notation("c1"));
     }
 }
