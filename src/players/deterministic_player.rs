@@ -16,7 +16,9 @@ impl Player for DeterministicPlayer {
 
         let square = if card.is_one_eyed_jack() {
             Square::playable_squares()
-                .find(|square| board.chip_at(square).map_or(false, |t| t != *team))
+                .find(|square| {
+                    board.chip_at(square).map_or(false, |t| t != *team) && !board.in_sequence(square)
+                })
                 .unwrap()
         } else if card.is_two_eyed_jack() {
             Square::playable_squares()

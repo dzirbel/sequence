@@ -236,12 +236,14 @@ mod tests {
     // TODO avoid use of RNG in the game deck
     #[test]
     fn deterministic_game_runs_without_panics() {
-        let players: Vec<Box<dyn Player>> = vec![
-            Box::new(DeterministicPlayer {}),
-            Box::new(DeterministicPlayer {}),
-        ];
+        for _ in 0..100 {
+            let players: Vec<Box<dyn Player>> = vec![
+                Box::new(DeterministicPlayer {}),
+                Box::new(DeterministicPlayer {}),
+            ];
 
-        let mut game = Game::new(players, 2);
-        game.run();
+            let mut game = Game::new(players, 2);
+            game.run();
+        }
     }
 }
